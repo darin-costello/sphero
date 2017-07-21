@@ -31,13 +31,15 @@
 #***********************************************************
 # author: Melonee Wise
 
-import rospy
-import roslib
+""""
+A Sphero node for Ros
+"""
 
 import math
 import sys
+
 import tf
-import PyKDL
+import rospy
 
 from spheropy.Sphero import Sphero
 from spheropy.Exception import SpheroException
@@ -46,14 +48,15 @@ import dynamic_reconfigure.server
 
 from sensor_msgs.msg import Imu
 from nav_msgs.msg import Odometry
-from geometry_msgs.msg import Point, Pose, Quaternion, Twist, TwistWithCovariance, Vector3
-from sphero.msg import SpheroCollision
+from geometry_msgs.msg import Point, Pose, Quaternion, Twist, Vector3
 from std_msgs.msg import ColorRGBA, Float32, Bool
-from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus
 from sphero.cfg import ReconfigConfig
+from sphero.msg import SpheroCollision
 
 
 class SpheroNode(object):
+    """ A sphero ros node"""
     battery_state = {1: "Battery Charging",
                      2: "Battery OK",
                      3: "Battery Low",
@@ -78,6 +81,7 @@ class SpheroNode(object):
         self.update_rate = default_update_rate
         self.sampling_divisor = int(400 / self.update_rate)
         self.is_connected = False
+        self.collision = None
 
         self.odom_pub = None
         self.imu_pub = None
@@ -147,7 +151,7 @@ class SpheroNode(object):
 
     def _init_params(self):
         if rospy.has_param('~bt_addr'):
-            self.robot_bt_addr = rospy.get_param('bt_addr')
+            self.robot_bt_addr = rospy.get_param('~bt_addr')
         else:
             rospy.logerr(
                 "Must specify sphero address with private param bt_addr")
@@ -162,20 +166,23 @@ class SpheroNode(object):
         self.diag_update_rate = rospy.Duration(
             rospy.get_param('~diag_update_rate', 1.0))
 
-    def normalize_angle_positive(self, angle):
+    def _normalize_angle_positive(self, angle):
         return math.fmod(math.fmod(angle, 2.0 * math.pi) + 2.0 * math.pi, 2.0 * math.pi)
 
     def start(self):
+        """
+        Starts the sphero node
+        """
 
         tries = 0
         while not self.is_connected and tries < 5:
             try:
                 self.is_connected = self.robot.connect()
                 rospy.loginfo("Connect to Sphero with address: %s",
-                              self.robot.bt.target_address)
+                              self.robot.bluetooth.address)
             except SpheroException as error:
                 rospy.logwarn(
-                    "Failed to connect to Sphero with error %s", error.messge)
+                    "Failed to connect to Sphero with error %s", error)
                 tries += 1
         if not self.is_connected:
             rospy.logerr("Cannot connect to sphero")
@@ -201,13 +208,16 @@ class SpheroNode(object):
         self.robot.register_collision_callback(self.handle_collision)
 
         # set the ball to connection color
-        self.robot.set_rgb_led(
-            self.connect_color_red, self.connect_color_green, self.connect_color_blue, 0, False)
+        self.robot.set_color(self.connect_color_red,
+                             self.connect_color_green, self.connect_color_blue)
         # now start receiving packets
         self.robot.start()
 
     def spin(self):
-        r = rospy.Rate(10.0)
+        """
+        Spins conditioned of ros being active
+        """
+        rate = rospy.Rate(10.0)
         while not rospy.is_shutdown():
             now = rospy.Time.now()
             if (now - self.last_cmd_vel_time) > self.cmd_vel_timeout:
@@ -219,10 +229,12 @@ class SpheroNode(object):
             if (now - self.last_diagnostics_time) > self.diag_update_rate:
                 self.last_diagnostics_time = now
                 self.publish_diagnostics(now)
-            r.sleep()
+            rate.sleep()
 
     def stop(self):
-        # tell the ball to stop moving before quiting
+        """
+        Stops, will tell the ball to stop moving before quiting
+        """
         self.robot.stop()
         rospy.sleep(1.0)
         self.is_connected = False
@@ -266,8 +278,8 @@ class SpheroNode(object):
             self.power_state_msg = self.battery_state[data]
 
     def handle_data_strm(self, data):
-        # TODO FIX THIS
         if self.is_connected:
+            data = data[0]
             now = rospy.Time.now()
             imu = Imu(header=rospy.Header(frame_id="imu_link"))
             imu.header.stamp = now
@@ -295,8 +307,8 @@ class SpheroNode(object):
                             child_frame_id='base_footprint')
             odom.header.stamp = now
 
-            odom = data['odom']
-            odom.pose.pose = Pose(Point(odom.x, odom.y, 0.0),
+            odom_data = data['odom']
+            odom.pose.pose = Pose(Point(odom_data.x, odom_data.y, 0.0),
                                   Quaternion(0.0, 0.0, 0.0, 1.0))
 
             velocity = data['velocity']
@@ -309,65 +321,61 @@ class SpheroNode(object):
 
             # need to publish this trasform to show the roll, pitch, and yaw
             # properly
+            quat = (quaternion.x, quaternion.y, quaternion.z, quaternion.w)
+            total = math.sqrt(sum(math.pow(i, 2) for i in quat))
             self.transform_broadcaster.sendTransform((0.0, 0.0, 0.038),
-                                                     (quaternion.x, quaternion.y,
-                                                      quaternion.z, quaternion.w),
+                                                     [i / total for i in quat],
                                                      odom.header.stamp, "base_link", "base_footprint")
 
     def cmd_vel(self, msg):
-        # TODO start here
         if self.is_connected:
             self.last_cmd_vel_time = rospy.Time.now()
-            self.cmd_heading = self.normalize_angle_positive(
+            self.cmd_heading = self._normalize_angle_positive(
                 math.atan2(msg.linear.x, msg.linear.y)) * 180 / math.pi
             self.cmd_speed = math.sqrt(
                 math.pow(msg.linear.x, 2) + math.pow(msg.linear.y, 2))
-            self.robot.roll(int(self.cmd_speed), int(
-                self.cmd_heading), 1, False)
+            self.robot.roll(int(self.cmd_speed), int(self.cmd_heading))
 
     def cmd_turn(self, msg):
         if self.is_connected:
-            self.robot.roll(0, int(msg.data), 0, False)
+            self.robot.roll(0, int(msg.data))
 
     def set_color(self, msg):
         if self.is_connected:
-            self.robot.set_rgb_led(
-                int(msg.r * 255), int(msg.g * 255), int(msg.b * 255), 0, False)
+            self.robot.set_color(
+                int(msg.r * 255), int(msg.g * 255), int(msg.b * 255))
 
     def set_back_led(self, msg):
         if self.is_connected:
-            self.robot.set_back_led(int(msg.data), False)
+            self.robot.set_back_light(int(msg.data))
 
     def set_stabilization(self, msg):
         if self.is_connected:
             if not msg.data:
-                self.robot.set_stablization(1, False)
+                self.robot.set_stabilization(True)
             else:
-                self.robot.set_stablization(0, False)
+                self.robot.set_stabilization(False)
 
     def set_heading(self, msg):
         if self.is_connected:
-            heading_deg = int(self.normalize_angle_positive(
+            heading_deg = int(self._normalize_angle_positive(
                 msg.data) * 180.0 / math.pi)
-            self.robot.set_heading(heading_deg, False)
+            self.robot.set_heading(heading_deg)
 
     def set_angular_velocity(self, msg):
         if self.is_connected:
             rate = int((msg.data * 180 / math.pi) / 0.784)
             self.robot.set_rotation_rate(rate, False)
 
-    def configure_collision_detect(self, msg):
-        pass
-
     def reconfigure(self, config, level):
         if self.is_connected:
-            self.robot.set_rgb_led(int(
-                config['red'] * 255), int(config['green'] * 255), int(config['blue'] * 255), 0, False)
+            self.robot.set_color(
+                int(config['red'] * 255), int(config['green'] * 255), int(config['blue'] * 255))
         return config
 
 
 if __name__ == '__main__':
-    s = SpheroNode()
-    s.start()
-    s.spin()
-    s.stop()
+    SPHERO = SpheroNode()
+    SPHERO.start()
+    SPHERO.spin()
+    SPHERO.stop()
