@@ -87,6 +87,7 @@ class SpheroNode(object):
         self.imu_pub = None
         self.collision_pub = None
         self.diag_pub = None
+
         self.cmd_vel_sub = None
         self.cmd_turn_sub = None
         self.color_sub = None
@@ -94,6 +95,7 @@ class SpheroNode(object):
         self.stabilization_sub = None
         self.heading_sub = None
         self.angular_velocity_sub = None
+
         self.reconfigure_srv = None
         self.transform_broadcaster = None
         self._init_pubsub()
@@ -215,7 +217,7 @@ class SpheroNode(object):
 
     def spin(self):
         """
-        Spins conditioned of ros being active
+        Spins conditioned on ros being active
         """
         rate = rospy.Rate(10.0)
         while not rospy.is_shutdown():
