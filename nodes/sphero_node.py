@@ -38,7 +38,6 @@ A Sphero node for Ros
 import math
 import sys
 
-import tf
 import rospy
 
 from spheropy.Sphero import Sphero
@@ -76,7 +75,7 @@ class SpheroNode(object):
                              0, 0, 0, 0, 1e6, 0,
                              0, 0, 0, 0, 0, 1e3]
 
-    def __init__(self, default_update_rate=50.0):
+    def __init__(self, default_update_rate=20.0):
         rospy.init_node('sphero_node')
         self.update_rate = default_update_rate
         self.sampling_divisor = int(400 / self.update_rate)
@@ -97,7 +96,7 @@ class SpheroNode(object):
         self.angular_velocity_sub = None
 
         self.reconfigure_srv = None
-        self.transform_broadcaster = None
+
         self._init_pubsub()
 
         self.robot_name = None
@@ -149,7 +148,6 @@ class SpheroNode(object):
             'set_angular_velocity', Float32, self.set_angular_velocity, queue_size=1)
         self.reconfigure_srv = dynamic_reconfigure.server.Server(
             ReconfigConfig, self.reconfigure)
-        self.transform_broadcaster = tf.TransformBroadcaster()
 
     def _init_params(self):
         if rospy.has_param('~bt_addr'):
@@ -180,14 +178,14 @@ class SpheroNode(object):
         while not self.is_connected and tries < 5:
             try:
                 self.is_connected = self.robot.connect()
-                rospy.loginfo("Connect to Sphero with address: %s",
-                              self.robot.bluetooth.address)
+                rospy.loginfo("Connected to %s with address: %s",
+                              self.robot_name, self.robot.bluetooth.address)
             except SpheroException as error:
                 rospy.logwarn(
-                    "Failed to connect to Sphero with error %s", error)
+                    "Failed to connect to %s with error %s\nTrying Again", self.robot_name, error)
                 tries += 1
         if not self.is_connected:
-            rospy.logerr("Cannot connect to sphero")
+            rospy.logerr("Cannot connect to %s", self.robot_name)
             sys.exit(1)
 
         # setup streaming
@@ -220,7 +218,7 @@ class SpheroNode(object):
         Spins conditioned on ros being active
         """
         rate = rospy.Rate(10.0)
-        while not rospy.is_shutdown():
+        while not rospy.is_shutdown() and self.robot.is_alive():
             now = rospy.Time.now()
             if (now - self.last_cmd_vel_time) > self.cmd_vel_timeout:
                 if self.cmd_heading != 0 or self.cmd_speed != 0:
@@ -237,7 +235,8 @@ class SpheroNode(object):
         """
         Stops, will tell the ball to stop moving before quiting
         """
-        self.robot.stop()
+        if self.robot.is_alive():
+            self.robot.stop()
         rospy.sleep(1.0)
         self.is_connected = False
         self.robot.disconnect()
@@ -320,14 +319,6 @@ class SpheroNode(object):
             odom.pose.covariance = self.ODOM_POSE_COVARIANCE
             odom.twist.covariance = self.ODOM_TWIST_COVARIANCE
             self.odom_pub.publish(odom)
-
-            # need to publish this trasform to show the roll, pitch, and yaw
-            # properly
-            quat = (quaternion.x, quaternion.y, quaternion.z, quaternion.w)
-            total = math.sqrt(sum(math.pow(i, 2) for i in quat))
-            self.transform_broadcaster.sendTransform((0.0, 0.0, 0.038),
-                                                     [i / total for i in quat],
-                                                     odom.header.stamp, "base_link", "base_footprint")
 
     def cmd_vel(self, msg):
         if self.is_connected:
