@@ -101,9 +101,6 @@ class SpheroNode(object):
 
         self.robot_name = None
         self.robot_bt_addr = None
-        self.connect_color_red = None
-        self.connect_color_blue = None
-        self.connect_color_green = None
         self.cmd_vel_timeout = None
         self.diag_update_rate = None
         self._init_params()
@@ -158,9 +155,6 @@ class SpheroNode(object):
             sys.exit(1)
 
         self.robot_name = rospy.get_param("~name", "Sphero")
-        self.connect_color_red = rospy.get_param('~connect_red', 0)
-        self.connect_color_blue = rospy.get_param('~connect_blue', 0)
-        self.connect_color_green = rospy.get_param('~connect_green', 255)
         self.cmd_vel_timeout = rospy.Duration(
             rospy.get_param('~cmd_vel_timeout', 0.6))
         self.diag_update_rate = rospy.Duration(
@@ -207,9 +201,6 @@ class SpheroNode(object):
         self.robot.start_collision_detection(45, 110, 45, 110, 1000)
         self.robot.register_collision_callback(self.handle_collision)
 
-        # set the ball to connection color
-        self.robot.set_color(self.connect_color_red,
-                             self.connect_color_green, self.connect_color_blue)
         # now start receiving packets
         self.robot.start()
 
@@ -336,7 +327,7 @@ class SpheroNode(object):
     def set_color(self, msg):
         if self.is_connected:
             self.robot.set_color(
-                int(msg.r * 255), int(msg.g * 255), int(msg.b * 255))
+                int(msg.r), int(msg.g), int(msg.b), default=True)
 
     def set_back_led(self, msg):
         if self.is_connected:
