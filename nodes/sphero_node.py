@@ -177,6 +177,7 @@ class SpheroNode(object):
             except SpheroException as error:
                 rospy.logwarn(
                     "Failed to connect to %s with error %s\nTrying Again", self.robot_name, error)
+                rospy.sleep(2)
                 tries += 1
         if not self.is_connected:
             rospy.logerr("Cannot connect to %s", self.robot_name)
