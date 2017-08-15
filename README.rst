@@ -25,6 +25,7 @@ A ros packge to control the sphero. This is an adaptation of Melonee Wise's orig
 
 
 **Topics**
+
 *Publishers*
 
 - odom: a nav_msgs/Odometry msg taken from sphero odom values
