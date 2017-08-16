@@ -24,6 +24,15 @@ A ros packge to control the sphero. This is an adaptation of Melonee Wise's orig
 
 
 
+**START UP**
+.. code-block:: terminal
+
+    roslaunch sphero sphero.launch name:=spheroy sphero_address:='xx:xx:xx:xx:xx'
+
+    roslaunch sphero keyboard_teleop.launch
+
+    roslaunch sphero sphero_dashboard.launch
+
 **Topics**
 
 *Publishers*
