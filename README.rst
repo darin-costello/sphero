@@ -4,12 +4,14 @@ Sphero ros package
 
 A ros packge to control the sphero. This is an adaptation of Melonee Wise's orignial package <https://github.com/mmwise/sphero_ros.git>. To use the spheropy sdk. It is mostly just an remapping to and from sphero commands and messges. A full list of sphero_node topics can be found below. This package a has a gui (sphero_dashboard) for setting sphero colors and heading, and a terminal teleop (sphero_teleop_keyboard).
 
-**Requirements:**
+Requirements
+---------------
 
 - spheropy
 
 
-**INSTALL**
+INSTALL
+-------------
 
 .. code-block:: bash
 
@@ -22,9 +24,9 @@ A ros packge to control the sphero. This is an adaptation of Melonee Wise's orig
     catkin_make install
 
 
+START UP
+------------
 
-
-**START UP**
 .. code-block:: terminal
 
     roslaunch sphero sphero.launch name:=spheroy sphero_address:='xx:xx:xx:xx:xx'
@@ -33,7 +35,9 @@ A ros packge to control the sphero. This is an adaptation of Melonee Wise's orig
 
     roslaunch sphero sphero_dashboard.launch
 
-**Topics**
+
+Topics
+----------
 
 *Publishers*
 
