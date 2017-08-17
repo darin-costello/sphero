@@ -41,7 +41,7 @@ import sys
 import rospy
 
 from spheropy.Sphero import Sphero
-from spheropy.Exception import SpheroException
+from spheropy.Exception import SpheroException, BluetoothException
 from spheropy.DataStream import DataStreamManager
 import dynamic_reconfigure.server
 
@@ -174,7 +174,7 @@ class SpheroNode(object):
                 self.is_connected = self.robot.connect()
                 rospy.loginfo("Connected to %s with address: %s",
                               self.robot_name, self.robot.bluetooth.address)
-            except SpheroException as error:
+            except (SpheroException, BluetoothException) as error:
                 rospy.logwarn(
                     "Failed to connect to %s with error %s\nTrying Again", self.robot_name, error)
                 rospy.sleep(2)
