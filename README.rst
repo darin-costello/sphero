@@ -4,7 +4,7 @@ Sphero ros package
 
 A ros packge to control the sphero. This is an adaptation of Melonee Wise's orignial package <https://github.com/mmwise/sphero_ros.git>. To use the spheropy sdk. It is mostly just an remapping to and from sphero commands and messges. A full list of sphero_node topics can be found below. This package a has a gui (sphero_dashboard) for setting sphero colors and heading, and a terminal teleop (sphero_teleop_keyboard).
 
-Requirements
+Requirements 
 ---------------
 
 - spheropy
